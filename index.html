@@ -7,11 +7,28 @@
     <meta name="description" content="Sistem monitoring nira kelapa berbasis IoT dengan ESP32, menampilkan data pH, suhu, volume, dan kadar gula secara real-time.">
     <meta name="keywords" content="IoT Nira, Monitoring Nira Kelapa, ESP32, Smart Farming, Dashboard IoT">
     <meta name="author" content="NiraLoka Team">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="s5JgxHbi9qK0fcUAvL3By49e3Zyr9-elhPtPh_MZ7tQ" />
+    <meta property="og:title" content="NiraSmart Pro - Monitoring Nira IoT">
+    <meta property="og:description" content="Sistem monitoring nira kelapa berbasis IoT real-time">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="preview.png">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
     <!-- Framework & Library -->
+    <link rel="icon" href="logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "NiraSmart Pro",
+            "url": "https://domainkamu.com",
+            "description": "Monitoring nira kelapa berbasis IoT ESP32"
+        }
+    </script>
+    <!-- MQTT Library -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script> <!-- MQTT EDIT --> 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
 
@@ -170,6 +187,11 @@
             inset: 0;
             width: 100% !important;
             height: 100% !important;
+        }
+
+        #niraChart {
+            width: 100%;
+            height: 300px !important;
         }
 
         .stat-card {
@@ -613,7 +635,7 @@
         <div class="panel">
             <h2><i class="fas fa-stream"></i> Aktivitas Log Penyadapan Terbaru</h2>
             <div class="table-container">
-                <table id="logTable">
+                <table id="dashboardLogTable">
                     <thead>
                         <tr>
                             <th>Waktu Transmisi</th>
@@ -850,6 +872,7 @@
         </div>
     </main>
 
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script> <!-- FIX WAJIB -->
     <script>
         // -- Inisialisasi Chart --
         const ctx = document.getElementById('niraChart').getContext('2d');
@@ -878,6 +901,7 @@
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 scales: {
                     y: { type: 'linear', position: 'left', title: { display: true, text: 'pH' } },
                     y1: { type: 'linear', position: 'right', title: { display: true, text: 'Suhu' }, grid: { drawOnChartArea: false } }
@@ -1044,20 +1068,26 @@
         }
         setInterval(updateClock, 1000);
 
-        // -- Simulasi Pengambilan Data --
-        function simulateESP32() {
-            if(!isSystemActive) return;
+        
+        // ================= HANDLE DATA MQTT ================= // MQTT EDIT
+        function handleIncomingData(data) {
+            if(!isSystemActive) {
+            console.log("Data masuk tapi sistem OFF");
+            // return; ❌ hapus ini agar data tetap diproses meski sistem belum aktif (untuk testing)
+            }
 
-            sensorCounter++;
-            const data = {
-                ph: (6.3 + Math.random() * 0.5).toFixed(2),
-                temp: (27.5 + Math.random() * 3).toFixed(1),
-                vol: Math.min(2000, 500 + (sensorCounter * 15)),
-                brix: (11.5 + Math.random() * 2).toFixed(1),
-                signal: (-65 + Math.random() * 10).toFixed(0),
-                voltage: (4.8 + Math.random() * 0.4).toFixed(1),
-                time: new Date().toLocaleTimeString('id-ID', { hour12: false })
-            };
+           // sensorCounter++;
+            //const data = {
+              //  ph: (6.3 + Math.random() * 0.5).toFixed(2),
+                //temp: (27.5 + Math.random() * 3).toFixed(1),
+                //vol: Math.min(2000, 500 + (sensorCounter * 15)),
+                //brix: (11.5 + Math.random() * 2).toFixed(1),
+                //signal: (-65 + Math.random() * 10).toFixed(0),
+                //voltage: (4.8 + Math.random() * 0.4).toFixed(1),
+                //time: new Date().toLocaleTimeString('id-ID', { hour12: false })
+            //};
+
+            const time = new Date().toLocaleTimeString('id-ID', { hour12: false }); // MQTT EDIT
 
             // Update UI
             document.getElementById('phVal').innerText = data.ph;
@@ -1073,7 +1103,7 @@
             if (voltageValDetail) voltageValDetail.innerText = data.voltage + " V";
 
             // Update Tank Visual
-            const pct = Math.floor((data.vol / 2000) * 100);
+            const pct = Math.floor((data.vol / settings.tankMax) * 100); // MQTT EDIT (pakai settings)
             document.getElementById('tankFluid').style.height = pct + "%";
             document.getElementById('tankPct').innerText = pct + "%";
 
@@ -1096,25 +1126,25 @@
                 niraChart.data.datasets[0].data.shift();
                 niraChart.data.datasets[1].data.shift();
             }
-            niraChart.data.labels.push(data.time);
+            // FIX MQTT TIME
+            niraChart.data.labels.push(time); // MQTT EDIT FIX
             niraChart.data.datasets[0].data.push(data.ph);
             niraChart.data.datasets[1].data.push(data.temp);
             niraChart.update();
 
-            // Update Detail Monitoring Charts (if visible)
-            pushChartData(phChart, data.time, data.ph);
-            pushChartData(tempChart, data.time, data.temp);
-            pushChartData(brixChart, data.time, data.brix);
-            pushChartData(volChart, data.time, data.vol);
-            pushChartData(signalChart, data.time, data.signal);
-            pushChartData(voltageChart, data.time, data.voltage);
+            pushChartData(phChart, time, data.ph); // MQTT EDIT FIX
+            pushChartData(tempChart, time, data.temp);
+            pushChartData(brixChart, time, data.brix);
+            pushChartData(volChart, time, data.vol);
+            pushChartData(signalChart, time, data.signal);
+            pushChartData(voltageChart, time, data.voltage);
 
             // Add Table Log
-            addLogRow(data);
+            addLogRow({ ...data, time });
         }
 
         function addLogRow(data) {
-            const tbody = document.querySelector('#logTable tbody');
+            const tbody = document.querySelector('#dashboardLogTable tbody');
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${data.time}</td>
@@ -1167,7 +1197,7 @@
         function updateIndicators(data) {
             // pH
             const phIndicator = document.getElementById('phIndicator');
-            if (data.ph < 5.8) {
+            if(data.ph < settings.phMin) {
                 phIndicator.className = 'status-indicator anomaly';
                 phIndicator.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Anomali';
             } else {
@@ -1266,12 +1296,68 @@
             }
         }
 
-        setInterval(simulateESP32, 2000);
+                // ================= MQTT CONFIG ================= // MQTT EDIT
+        const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt"; // MQTT EDIT (pakai wss)
+        const MQTT_TOPIC = "nira/esp32/data"; // MQTT EDIT (sesuaikan dengan ESP32 kamu)
+
+        let mqttClient; // MQTT EDIT
+
+        function initMQTT() {
+            mqttClient = mqtt.connect(MQTT_BROKER); // MQTT EDIT
+
+            mqttClient.on("connect", () => {
+                console.log("MQTT Connected"); // MQTT EDIT
+                mqttClient.subscribe(MQTT_TOPIC); // MQTT EDIT
+            });
+
+            mqttClient.on("message", (topic, message) => {
+                if (topic === MQTT_TOPIC) {
+                    try {
+                        const data = JSON.parse(message.toString()); // MQTT EDIT
+                        handleIncomingData(data); // MQTT EDIT
+                    } catch (e) {
+                        console.error("MQTT Parse Error:", e);
+                    }
+                }
+            });
+
+            mqttClient.on("error", (err) => {
+                console.error("MQTT Error:", err); // MQTT EDIT
+            });
+        }
+
+        //setInterval(simulateESP32, 2000);
 
         window.addEventListener('load', () => {
             console.log('Page loaded');
-            initMainChart();
+            //initMainChart();
             switchView('dashboard');
+            initMQTT(); // MQTT EDIT
+        });
+
+        mqttClient.on("message", (topic, message) => {
+            console.log("📩 RAW MQTT:", message.toString()); // MQTT DEBUG
+
+            if (topic === MQTT_TOPIC) {
+                try {
+                    const data = JSON.parse(message.toString());
+                    console.log("✅ PARSED DATA:", data); // MQTT DEBUG
+                    handleIncomingData(data);
+                } catch (e) {
+                    console.error("❌ MQTT Parse Error:", e);
+                }
+            }
+        });
+        mqttClient.on("message", (topic, message) => {
+            console.log("RAW:", message.toString()); // DEBUG
+
+            try {
+                const data = JSON.parse(message.toString());
+                console.log("PARSED:", data);
+                handleIncomingData(data);
+            } catch (e) {
+                console.error("❌ MQTT Parse Error:", e);
+            }
         });
     </script>
 </body>
