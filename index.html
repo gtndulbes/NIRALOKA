@@ -574,25 +574,25 @@
             <div class="stat-card">
                 <i class="fas fa-vial"></i>
                 <h3>Tingkat pH</h3>
-                <div class="val" id="phVal">6.5</div>
+                <div class="val" id="phVal">-</div>
                 <span id="phStatus" class="indicator" style="color: var(--success)">Optimal</span>
             </div>
             <div class="stat-card">
                 <i class="fas fa-thermometer-three-quarters"></i>
                 <h3>Suhu Nira</h3>
-                <div class="val" id="tempVal">28.4°C</div>
+                <div class="val" id="tempVal">-</div>
                 <span id="tempStatus" class="indicator" style="color: var(--success)">Normal</span>
             </div>
             <div class="stat-card">
                 <i class="fas fa-cookie-bite"></i>
                 <h3>Kadar Gula (Brix)</h3>
-                <div class="val" id="brixVal">12.5%</div>
+                <div class="val" id="brixVal">-</div>
                 <span class="indicator" style="color: var(--text-muted)">High Quality</span>
             </div>
             <div class="stat-card">
                 <i class="fas fa-database"></i>
                 <h3>Total Nira</h3>
-                <div class="val" id="volVal">750 ml</div>
+                <div class="val" id="volVal">-</div>
                 <span id="volStatus" class="indicator" style="color: var(--warning)">Tengah Terisi</span>
             </div>
         </div>
@@ -618,8 +618,8 @@
                     </div>
                     <div style="text-align: left;">
                         <p style="font-size: 0.8rem; margin-bottom: 8px;"><i class="fas fa-microchip"></i> Motor: <span id="motorStat" style="font-weight: 700; color: var(--danger);">IDLE</span></p>
-                        <p style="font-size: 0.8rem; margin-bottom: 8px;"><i class="fas fa-wifi"></i> Sinyal: <span id="signalVal" style="font-weight: 700; color: var(--success);">-65dBm</span></p>
-                        <p style="font-size: 0.8rem;"><i class="fas fa-bolt"></i> Voltase: <span id="voltageVal" style="font-weight: 700;">5.0V</span></p>
+                        <p style="font-size: 0.8rem; margin-bottom: 8px;"><i class="fas fa-wifi"></i> Sinyal: <span id="signalVal" style="font-weight: 700; color: var(--success);">-</span></p>
+                        <p style="font-size: 0.8rem;"><i class="fas fa-bolt"></i> Voltase: <span id="voltageVal" style="font-weight: 700;">-</span></p>
                     </div>
                 </div>
 
@@ -864,12 +864,41 @@
                     </div>
                 </div>
             </div>
-            <div class="stat-card" style="padding: 40px; text-align: center;">
-                <i class="fas fa-file-export" style="font-size: 3rem; color: var(--accent); margin-bottom: 20px;"></i>
-                <h3>Laporan</h3>
-                <p>Fitur ini sedang dalam pengembangan. Akan menampilkan opsi ekspor laporan dan analisis data historis.</p>
+
+            <div class="panel">
+                <h2><i class="fas fa-file-alt"></i> Export Laporan</h2>
+            <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:20px;">
+                <button class="btn btn-start" onclick="exportReportCSV()">
+                    <i class="fas fa-file-csv"></i> Export CSV
+                </button>
+                <button class="btn btn-settings" onclick="exportReportJSON()">
+                    <i class="fas fa-file-code"></i> Export JSON
+                </button>
+                <button class="btn btn-stop" onclick="clearReportData()">
+                    <i class="fas fa-trash"></i> Hapus Data
+                </button>
             </div>
-        </div>
+
+            <h2><i class="fas fa-chart-bar"></i> Grafik Laporan</h2>
+
+            <div class="dashboard-grid">
+                <div class="panel layout-panel">
+                    <h3>Volume</h3>
+                    <div class="chart-wrapper"><canvas id="reportVolumeChart"></canvas></div>
+                </div>
+                <div class="panel layout-panel">
+                    <h3>pH</h3>
+                    <div class="chart-wrapper"><canvas id="reportPhChart"></canvas></div>
+                </div>
+                <div class="panel layout-panel">
+                    <h3>Suhu</h3>
+                    <div class="chart-wrapper"><canvas id="reportTempChart"></canvas></div>
+                </div>
+                <div class="panel layout-panel">
+                    <h3>Brix (%)</h3>
+                    <div class="chart-wrapper"><canvas id="reportBrixChart"></canvas></div>
+                </div>
+            </div>
     </main>
 
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script> <!-- FIX WAJIB -->
@@ -951,6 +980,53 @@
             });
         }
 
+        function initReportCharts() {
+            if (reportCharts.volume) return;
+
+            reportCharts.volume = new Chart(document.getElementById('reportVolumeChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Volume', data: [] }] }
+            });
+
+            reportCharts.ph = new Chart(document.getElementById('reportPhChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'pH', data: [] }] }
+            });
+
+            reportCharts.temp = new Chart(document.getElementById('reportTempChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Suhu', data: [] }] }
+            });
+
+            reportCharts.brix = new Chart(document.getElementById('reportBrixChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Brix (%)', data: [] }] }
+            });
+        }
+
+        function updateReportCharts() {
+            initReportCharts();
+
+            const labels = sensorHistory.map(d => d.time);
+
+            reportCharts.volume.data.labels = labels;
+            reportCharts.volume.data.datasets[0].data = sensorHistory.map(d => d.vol);
+
+            reportCharts.ph.data.labels = labels;
+            reportCharts.ph.data.datasets[0].data = sensorHistory.map(d => d.ph);
+
+            reportCharts.temp.data.labels = labels;
+            reportCharts.temp.data.datasets[0].data = sensorHistory.map(d => d.temp);
+
+            reportCharts.brix.data.labels = labels;
+            reportCharts.brix.data.datasets[0].data = sensorHistory.map(d => d.brix);
+
+            reportCharts.volume.update();
+            reportCharts.ph.update();
+            reportCharts.temp.update();
+            reportCharts.brix.update();
+        }
+
         function switchView(view) {
             try {
                 console.log('Switching to view:', view);
@@ -1020,6 +1096,34 @@
             // For example: load data for log view, initialize settings, etc.
         }
 
+        function exportReportCSV() {
+            let csv = "Waktu,pH,Suhu,Volume,Brix\n";
+
+            sensorHistory.forEach(d => {
+                csv += `${d.time},${d.ph},${d.temp},${d.vol},${d.brix}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'laporan_nira.csv';
+            a.click();
+        }
+
+        function exportReportJSON() {
+            const blob = new Blob([JSON.stringify(sensorHistory, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'laporan_nira.json';
+            a.click();
+        }
+
+        function clearReportData() {
+            sensorHistory = [];
+            updateReportCharts();
+            showToast("Data laporan dihapus", "success");
+        }
+
         function pushChartData(chart, label, value) {
             if (!chart || !chart.data) return;
             if (chart.data.labels.length > 20) {
@@ -1045,7 +1149,7 @@
         let logSortDesc = true; // waktu terbaru di atas
 
         let logVolumeChart, logPhChart;
-        let reportCharts = { volume: null, ph: null, temp: null };
+        let reportCharts = { volume: null, ph: null, temp: null, brix: null  };
 
         // Default settings - bisa disimpan di localStorage
         const defaultSettings = {
@@ -1138,6 +1242,21 @@
             pushChartData(volChart, time, data.vol);
             pushChartData(signalChart, time, data.signal);
             pushChartData(voltageChart, time, data.voltage);
+
+            // Simpan ke history laporan
+            sensorHistory.push({
+                time: time,
+                ph: data.ph,
+                temp: data.temp,
+                vol: data.vol,
+                brix: data.brix
+            });
+
+            // Batasi data biar tidak berat
+            if(sensorHistory.length > 100) sensorHistory.shift();
+
+            // Update grafik laporan
+            updateReportCharts();
 
             // Add Table Log
             addLogRow({ ...data, time });
