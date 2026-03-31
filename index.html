@@ -17,7 +17,6 @@
     <!-- Framework & Library -->
     <link rel="icon" type="image/png" sizes="48x48" href="/logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="application/ld+json">
         {
             "@context": "https://schema.org",
@@ -27,9 +26,6 @@
             "description": "Monitoring nira kelapa berbasis IoT ESP32"
         }
     </script>
-    <!-- MQTT Library -->
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script> <!-- MQTT EDIT --> 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script> <!-- Supabase EDIT -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
 
@@ -902,12 +898,12 @@
             </div>
     </main>
 
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script> <!-- FIX WAJIB -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
 
-        const supabaseUrl = "https://bkytenvqrtnjcycggkiq.supabase.co";
-        const supabaseKey = "sb_publishable_iQBQU1vyGljsT4yfxRFopA_MPwqQzlQ";
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
 
         // -- Inisialisasi Chart --
         const ctx = document.getElementById('niraChart').getContext('2d');
@@ -1039,42 +1035,43 @@
             try {
                 console.log('Switching to view:', view);
 
-                // Hide all views by removing active class
-                const allViews = document.querySelectorAll('.view');
-                allViews.forEach(v => v.classList.remove('active'));
+                // hide semua
+                document.querySelectorAll('.view')
+                    .forEach(v => v.classList.remove('active'));
 
-                // Show target view by adding active class
+                // tampilkan target
                 const targetView = document.getElementById(view + 'View');
-                if (targetView) {
-                    targetView.classList.add('active');
-                    console.log('View activated:', view);
 
-                    // Update page title based on view
-                    updatePageTitle(view);
-                } else {
+                if (!targetView) {
                     console.error('View not found:', view + 'View');
-                    // Fallback to dashboard if view not found
                     document.getElementById('dashboardView').classList.add('active');
+                    return;
                 }
 
-                // Update navigation active state
-                const allNavLinks = document.querySelectorAll('.nav-link');
-                allNavLinks.forEach(link => {
-                    if (link.dataset.view === view) {
-                        link.classList.add('active');
-                    } else {
-                        link.classList.remove('active');
-                    }
+                targetView.classList.add('active');
+
+                // update nav
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.toggle('active', link.dataset.view === view);
                 });
 
-                // Handle view-specific initialization
+                // update title
+                updatePageTitle(view);
+
+                // logic tambahan
                 handleViewSpecificLogic(view);
 
+                // log handler
                 if (view === 'log') {
                     loadHistory();
 
                     if (!logInterval) {
                         logInterval = setInterval(loadHistory, 5000);
+                    }
+                } else {
+                    if (logInterval) {
+                        clearInterval(logInterval);
+                        logInterval = null;
                     }
                 }
 
@@ -1286,8 +1283,13 @@
 
         }
 
+        const supabaseClient = supabase.createClient(
+            "https://bkytenvqrtnjcycggkiq.supabase.co",
+            "sb_publishable_iQBQU1vyGljsT4yfxRFopA_MPwqQzlQ"
+        );
+
         async function saveToSupabase(data, time) {
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('nira_log')
                 .insert([{
                     timestamp: new Date().toISOString(),
@@ -1307,7 +1309,7 @@
         }
 
         async function loadHistory() {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('nira_log')
                 .select('*')
                 .order('timestamp', { ascending: false })
